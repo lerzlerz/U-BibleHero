@@ -1,6 +1,12 @@
 /* src/App.css */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* Global Webkit tap and focus reset */
+button, input, select, textarea, a {
+  -webkit-tap-highlight-color: transparent !important;
+  outline: none !important;
+}
+
 :root {
   --bg-color: #0b130e;
   --forest-dark: #1b4332;
@@ -1033,4 +1039,17 @@ canvas {
   .interaction-prompt {
     display: none !important;
   }
+}
+
+/* Force option buttons to stay unhighlighted and unselected when focused */
+.option-button:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(82, 183, 136, 0.15) !important;
+}
+
+.option-button:focus .option-letter {
+  background: rgba(82, 183, 136, 0.2) !important;
+  color: var(--forest-glow) !important;
 }
