@@ -1018,12 +1018,8 @@ canvas {
     max-height: none !important;
   }
   
-  /* Floating interaction prompt adjusted for mobile */
+  /* Floating interaction prompt adjusted for mobile (completely hidden since it auto-triggers) */
   .interaction-prompt {
-    bottom: 20px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    font-size: 0.85rem !important;
-    padding: 8px 16px !important;
+    display: none !important;
   }
 }

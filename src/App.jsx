@@ -154,6 +154,16 @@ export default function App() {
   const cameraOffsetRef = useRef({ x: 0, y: 0 });
   const lastClickTimeRef = useRef(0);
   
+  // Mobile auto-trigger on contact refs
+  const lastTriggeredNpcIdxRef = useRef(-1);
+  const currentDialogueNpcRef = useRef(null);
+  const triggerNpcDialogueRef = useRef(null);
+  
+  // Mobile confirm interaction popup state & refs
+  const [mobileInteractTarget, setMobileInteractTarget] = useState(null);
+  const mobileInteractTargetRef = useRef(null);
+  const dismissedNpcRef = useRef(-1);
+  
   // Results profile state
   const [resultsProfile, setResultsProfile] = useState(null);
   
@@ -346,6 +356,25 @@ export default function App() {
       });
     }
   }, [answers, currentDialogueNpc, dialogueStep, activeDialogueQ1, activeDialogueQ2, resolvedNpcs]);
+  // Auto trigger dialogue for mobile on contact
+  const triggerNpcDialogue = useCallback((adj) => {
+    if (gameState !== 'playing') return;
+    const unansweredQ1s = questionsData.slice(0, 20).filter(q => !answersRef.current[q.id]);
+    const q1 = unansweredQ1s[Math.floor(Math.random() * unansweredQ1s.length)] || questionsData[0];
+    
+    const unansweredQ2s = questionsData.slice(20, 40).filter(q => !answersRef.current[q.id]);
+    const q2 = unansweredQ2s[Math.floor(Math.random() * unansweredQ2s.length)] || questionsData[20];
+    
+    setActiveDialogueQ1(q1);
+    setActiveDialogueQ2(q2);
+    setCurrentDialogueNpc(adj);
+    setDialogueStep(0);
+  }, [gameState]);
+
+  useEffect(() => {
+    triggerNpcDialogueRef.current = triggerNpcDialogue;
+  }, [triggerNpcDialogue]);
+
   // Answer a question and progress dialogue (with interval step to prevent double taps)
   const handleAnswerQuestion = (selectedType) => {
     if (!currentDialogueNpc || !activeDialogueQ1 || !activeDialogueQ2) return;
@@ -637,6 +666,18 @@ export default function App() {
   useEffect(() => {
     handleCompleteTestRef.current = handleCompleteTest;
   }, [handleCompleteTest]);
+  
+  useEffect(() => {
+    currentDialogueNpcRef.current = currentDialogueNpc;
+  }, [currentDialogueNpc]);
+
+  useEffect(() => {
+    mobileInteractTargetRef.current = mobileInteractTarget;
+  }, [mobileInteractTarget]);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   // Canvas Anim/Render Loop
   useEffect(() => {
@@ -653,69 +694,45 @@ export default function App() {
       // ----------------------------------------------------
       // 1. UPDATE PLAYER PHYSICS (Velocity, Acceleration, Deceleration)
       // ----------------------------------------------------
+      // Check keyboard/mouse constant speed movement (zero drift, zero acceleration, instant stop)
       let ax = 0;
       let ay = 0;
       
-      // Check keyboard
       if (keysRef.current.up) ay -= 1;
       if (keysRef.current.down) ay += 1;
       if (keysRef.current.left) ax -= 1;
       if (keysRef.current.right) ax += 1;
       
-      // Check mouse target steering (snap and stop immediately on arrival to prevent overshoot)
-      if (targetPosRef.current) {
+      let keyboardMoving = (ax !== 0 || ay !== 0);
+      
+      let vx = 0;
+      let vy = 0;
+      const movementSpeed = 2.8; // Constant speed (pixels per frame) for tight controls with zero slide
+      
+      if (keyboardMoving) {
+        targetPosRef.current = null; // Cancel any touch/mouse destination if keyboard is pressed
+        const len = Math.hypot(ax, ay);
+        vx = (ax / len) * movementSpeed;
+        vy = (ay / len) * movementSpeed;
+      } else if (targetPosRef.current) {
         const dx = targetPosRef.current.x - playerPosRef.current.x;
         const dy = targetPosRef.current.y - playerPosRef.current.y;
         const dist = Math.hypot(dx, dy);
         
-        if (dist < 5) {
+        if (dist <= movementSpeed) {
           playerPosRef.current.x = targetPosRef.current.x;
           playerPosRef.current.y = targetPosRef.current.y;
           targetPosRef.current = null;
-          vxRef.current = 0;
-          vyRef.current = 0;
-          ax = 0;
-          ay = 0;
+          vx = 0;
+          vy = 0;
         } else {
-          const angle = Math.atan2(dy, dx);
-          ax = Math.cos(angle);
-          ay = Math.sin(angle);
+          vx = (dx / dist) * movementSpeed;
+          vy = (dy / dist) * movementSpeed;
         }
       }
       
-      // Normalize diagonal acceleration
-      if (ax !== 0 && ay !== 0) {
-        ax *= 0.7071;
-        ay *= 0.7071;
-      }
-      
-      // Apply forces (smooth sliding acceleration & slower max speed)
-      const accRate = 0.12; // Lower acceleration for a smoother glide
-      const friction = 0.85; // Slide friction
-      const maxSpeed = 1.8; // Max speed is 1.8 pixels/frame (slower and more controllable)
-      
-      if (ax !== 0) {
-        vxRef.current += ax * accRate;
-      } else {
-        vxRef.current *= friction;
-      }
-      
-      if (ay !== 0) {
-        vyRef.current += ay * accRate;
-      } else {
-        vyRef.current *= friction;
-      }
-      
-      // Limit speed
-      const currentSpeed = Math.hypot(vxRef.current, vyRef.current);
-      if (currentSpeed > maxSpeed) {
-        vxRef.current = (vxRef.current / currentSpeed) * maxSpeed;
-        vyRef.current = (vyRef.current / currentSpeed) * maxSpeed;
-      }
-      
-      // Zero out tiny values
-      if (Math.abs(vxRef.current) < 0.05) vxRef.current = 0;
-      if (Math.abs(vyRef.current) < 0.05) vyRef.current = 0;
+      vxRef.current = vx;
+      vyRef.current = vy;
       
       // ----------------------------------------------------
       // 2. TILE COLLISION DETECTION & SLIDING RESOLUTION
@@ -768,14 +785,14 @@ export default function App() {
         const mapTotalHeight = MAP_SIZE * TILE_SIZE;
         
         if (displayWidth >= mapTotalWidth) {
-          cameraOffsetRef.current.x = (displayWidth - mapTotalWidth) / 2;
+          cameraOffsetRef.current.x = 0; // PC big screen: CSS flex centers the canvas, offset must be 0 to avoid clipping
         } else {
           const targetCamX = displayWidth / 2 - px;
           cameraOffsetRef.current.x = Math.max(Math.min(0, targetCamX), -(mapTotalWidth - displayWidth));
         }
         
         if (displayHeight >= mapTotalHeight) {
-          cameraOffsetRef.current.y = (displayHeight - mapTotalHeight) / 2;
+          cameraOffsetRef.current.y = 0; // PC big screen: CSS flex centers the canvas, offset must be 0 to avoid clipping
         } else {
           const targetCamY = displayHeight / 2 - py;
           cameraOffsetRef.current.y = Math.max(Math.min(0, targetCamY), -(mapTotalHeight - displayHeight));
@@ -793,18 +810,35 @@ export default function App() {
       }
       
       // Dynamically update the adjacent NPC status for prompt
-      const adj = checkAdjacentNpc(px, py);
-      if (adj) {
-        if (!adjacentNpcStateRef.current || adjacentNpcStateRef.current.index !== adj.index) {
-          adjacentNpcStateRef.current = adj;
-          setAdjacentNpcState(adj);
+        const adj = checkAdjacentNpc(px, py);
+        if (adj) {
+          if (!adjacentNpcStateRef.current || adjacentNpcStateRef.current.index !== adj.index) {
+            adjacentNpcStateRef.current = adj;
+            setAdjacentNpcState(adj);
+          }
+          
+          // Mobile confirm interaction popup trigger
+          if (window.innerWidth < 768) {
+            if (
+              !resolvedNpcsRef.current.has(adj.index) && 
+              currentDialogueNpcRef.current === null && 
+              mobileInteractTargetRef.current === null &&
+              dismissedNpcRef.current !== adj.index
+            ) {
+              setMobileInteractTarget(adj);
+            }
+          }
+        } else {
+          if (adjacentNpcStateRef.current !== null) {
+            adjacentNpcStateRef.current = null;
+            setAdjacentNpcState(null);
+          }
+          lastTriggeredNpcIdxRef.current = -1;
+          dismissedNpcRef.current = -1; // Reset dismissed state when leaving NPC range
+          if (mobileInteractTargetRef.current !== null) {
+            setMobileInteractTarget(null);
+          }
         }
-      } else {
-        if (adjacentNpcStateRef.current !== null) {
-          adjacentNpcStateRef.current = null;
-          setAdjacentNpcState(null);
-        }
-      }
       
       // ----------------------------------------------------
       // 3. CLEAR CANVAS & DRAW MAP
@@ -997,7 +1031,7 @@ export default function App() {
               <div className="instruction-single-card">
                 <div className="instruction-emoji">🔮</div>
                 <h3>探索答题</h3>
-                <p>寻找林中的心灵引导者，站在NPC身边时按空格键(Space)或手机屏幕点击心灵导引者，开启心灵对话。</p>
+                <p>寻找林中的心灵引导者。靠近时按<strong>空格键(Space)</strong>，在手机端只需走近接触导引者，即可自动开启心灵对话。</p>
               </div>
               <button className="btn-primary" onClick={() => setStartStep(3)}>继续 (3 / 4)</button>
             </div>
@@ -1169,6 +1203,53 @@ export default function App() {
           )}
         </div>
       )}
+          
+          
+          {/* Mobile Auto-Contact Confirm Modal */}
+          {window.innerWidth < 768 && mobileInteractTarget && (
+            <div className="dialog-overlay mobile-confirm-overlay">
+              <div className="dialog-card mobile-confirm-card" style={{ maxWidth: '320px', width: '85%' }}>
+                <div className="dialog-npc-header">
+                  <span className="dialog-npc-avatar">{mobileInteractTarget.emoji}</span>
+                </div>
+                <p className="dialog-question-text" style={{ textAlign: 'center', margin: '20px 0', fontSize: '1.1rem', fontWeight: '500' }}>
+                  是否与引导者对话？
+                </p>
+                <div className="confirm-buttons" style={{ display: 'flex', gap: '15px', width: '100%', boxSizing: 'border-box' }}>
+                  <button 
+                    className="btn-secondary" 
+                    style={{ flex: 1, padding: '12px', fontSize: '1rem' }}
+                    onClick={() => {
+                      dismissedNpcRef.current = mobileInteractTarget.index;
+                      setMobileInteractTarget(null);
+                    }}
+                  >
+                    否
+                  </button>
+                  <button 
+                    className="btn-primary" 
+                    style={{ flex: 1, padding: '12px', fontSize: '1rem' }}
+                    onClick={() => {
+                      const adj = mobileInteractTarget;
+                      const unansweredQ1s = questionsData.slice(0, 20).filter(q => !answersRef.current[q.id]);
+                      const q1 = unansweredQ1s[Math.floor(Math.random() * unansweredQ1s.length)] || questionsData[0];
+                      
+                      const unansweredQ2s = questionsData.slice(20, 40).filter(q => !answersRef.current[q.id]);
+                      const q2 = unansweredQ2s[Math.floor(Math.random() * unansweredQ2s.length)] || questionsData[20];
+                      
+                      setActiveDialogueQ1(q1);
+                      setActiveDialogueQ2(q2);
+                      setCurrentDialogueNpc(adj);
+                      setDialogueStep(0);
+                      setMobileInteractTarget(null);
+                    }}
+                  >
+                    是
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* ----------------- RESULTS SCREEN ----------------- */}
       {gameState === 'results' && resultsProfile && (
