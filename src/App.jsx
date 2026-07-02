@@ -1153,6 +1153,8 @@ export default function App() {
               </div>
             </div>
           )}
+        </div>
+      )}
           
           {/* ----------------- RESULTS SCREEN ----------------- */}
       {gameState === 'results' && resultsProfile && (
