@@ -1166,7 +1166,7 @@ export default function App() {
                 <div className="options-list">
                   {activeQuestion.options.map((opt, oIdx) => (
                     <button 
-                      key={oIdx} 
+                      key={`${activeQuestion.id}-${oIdx}`} 
                       className="option-button"
                       onClick={() => handleAnswerQuestion(opt.type)}
                     >
