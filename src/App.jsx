@@ -758,15 +758,29 @@ export default function App() {
       playerPosRef.current.x = px;
       playerPosRef.current.y = py;
       
-      // CAMERA FOLLOW SYSTEM
-      const rect = canvas.getBoundingClientRect();
-      const displayWidth = rect.width;
-      const displayHeight = rect.height;
-      const targetCamX = displayWidth / 2 - px;
-      const targetCamY = displayHeight / 2 - py;
-      
-      cameraOffsetRef.current.x = Math.max(Math.min(0, targetCamX), -(MAP_SIZE * TILE_SIZE - displayWidth));
-      cameraOffsetRef.current.y = Math.max(Math.min(0, targetCamY), -(MAP_SIZE * TILE_SIZE - displayHeight));
+      // CAMERA FOLLOW SYSTEM (relative to parent container viewport, with auto-centering on larger screens)
+      const wrapper = canvas.parentElement;
+      if (wrapper) {
+        const rect = wrapper.getBoundingClientRect();
+        const displayWidth = rect.width;
+        const displayHeight = rect.height;
+        const mapTotalWidth = MAP_SIZE * TILE_SIZE;
+        const mapTotalHeight = MAP_SIZE * TILE_SIZE;
+        
+        if (displayWidth >= mapTotalWidth) {
+          cameraOffsetRef.current.x = (displayWidth - mapTotalWidth) / 2;
+        } else {
+          const targetCamX = displayWidth / 2 - px;
+          cameraOffsetRef.current.x = Math.max(Math.min(0, targetCamX), -(mapTotalWidth - displayWidth));
+        }
+        
+        if (displayHeight >= mapTotalHeight) {
+          cameraOffsetRef.current.y = (displayHeight - mapTotalHeight) / 2;
+        } else {
+          const targetCamY = displayHeight / 2 - py;
+          cameraOffsetRef.current.y = Math.max(Math.min(0, targetCamY), -(mapTotalHeight - displayHeight));
+        }
+      }
       
       // Check if we hit the portal
       if (resolvedNpcsRef.current.size >= 16) {

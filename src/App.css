@@ -1006,9 +1006,13 @@ canvas {
     overflow: hidden !important;
     position: relative !important;
     background: #060b08 !important;
+    display: block !important; /* Prevent flexbox centering on mobile overflow */
   }
   
   .canvas-wrapper canvas {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     transform-origin: 0 0 !important;
     max-width: none !important;
     max-height: none !important;
