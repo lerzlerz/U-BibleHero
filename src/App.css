@@ -424,15 +424,24 @@ canvas {
   gap: 15px;
 }
 
-.option-button:hover {
-  background: rgba(82, 183, 136, 0.12);
-  border-color: var(--forest-light);
-  transform: translateX(5px);
-  box-shadow: 0 4px 15px rgba(82, 183, 136, 0.1);
+@media (hover: hover) {
+  .option-button:hover {
+    background: rgba(82, 183, 136, 0.12);
+    border-color: var(--forest-light);
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(82, 183, 136, 0.1);
+  }
 }
 
 .option-button:active {
-  transform: translateX(2px);
+  transform: scale(0.98);
+  background: rgba(251, 133, 0, 0.2) !important;
+  border-color: var(--gold) !important;
+}
+
+.option-button:active .option-letter {
+  background: var(--gold) !important;
+  color: var(--bg-color) !important;
 }
 
 .option-letter {
@@ -449,9 +458,11 @@ canvas {
   flex-shrink: 0;
 }
 
-.option-button:hover .option-letter {
-  background: var(--gold);
-  color: var(--bg-color);
+@media (hover: hover) {
+  .option-button:hover .option-letter {
+    background: var(--gold);
+    color: var(--bg-color);
+  }
 }
 
 /* Results Screen */
