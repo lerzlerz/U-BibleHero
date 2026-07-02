@@ -917,3 +917,96 @@ canvas {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ====================================================
+   Mobile Layout Adaptations (Max 768px)
+   ==================================================== */
+@media (max-width: 768px) {
+  .game-container {
+    flex-direction: column !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+  
+  .hud-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    border-right: none !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+    padding: 10px 15px !important;
+    box-sizing: border-box !important;
+    background: rgba(10, 18, 14, 0.95) !important;
+  }
+  
+  /* Hide unnecessary headers and hints on mobile to conserve space */
+  .hud-sidebar .hud-header,
+  .hud-sidebar .controls-hint,
+  .hud-sidebar .restart-btn,
+  .hud-sidebar .stats-panel .stat-row:not(.portal-status-row),
+  .hud-sidebar .stats-panel .progress-bar-container {
+    display: none !important;
+  }
+  
+  /* Compact stats panel for top horizontal view */
+  .hud-sidebar .stats-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0 !important;
+  }
+  
+  /* Align NPC slots into exactly 2 rows of 10 slots each */
+  .hud-sidebar .npc-slots-grid {
+    display: grid !important;
+    grid-template-columns: repeat(10, 1fr) !important;
+    gap: 4px !important;
+    margin: 4px 0 !important;
+    padding: 6px !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+  }
+  
+  .hud-sidebar .npc-slot {
+    font-size: 0.9rem !important;
+    border-radius: 4px !important;
+  }
+  
+  /* Position Portal Status Row */
+  .hud-sidebar .stats-panel .stat-row.portal-status-row {
+    margin-top: 5px !important;
+    padding-top: 5px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    font-size: 0.85rem !important;
+  }
+  
+  .hud-sidebar .temple-unlocked-card {
+    margin: 5px 0 0 0 !important;
+    padding: 8px !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* Ensure Canvas takes rest of viewport and is scrollable/overflow-scrollable */
+  .canvas-wrapper {
+    flex-grow: 1 !important;
+    width: 100% !important;
+    height: 0 !important; /* Forces flex to take rest */
+    overflow: hidden !important; /* Panned via dual finger drag */
+    position: relative !important;
+    background: #060b08 !important;
+  }
+  
+  .canvas-wrapper canvas {
+    transform-origin: 0 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+  
+  /* Floating interaction prompt adjusted for mobile */
+  .interaction-prompt {
+    bottom: 20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    font-size: 0.85rem !important;
+    padding: 8px 16px !important;
+  }
+}

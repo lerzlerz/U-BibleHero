@@ -148,6 +148,12 @@ export default function App() {
   const targetPosRef = useRef(null);
   const adjacentNpcStateRef = useRef(null);
   
+  // Mobile gestures & camera offsets
+  const isDraggingRef = useRef(false);
+  const lastTouchPosRef = useRef({ x: 0, y: 0 });
+  const cameraOffsetRef = useRef({ x: 0, y: 0 });
+  const lastClickTimeRef = useRef(0);
+  
   // Results profile state
   const [resultsProfile, setResultsProfile] = useState(null);
   
@@ -462,31 +468,157 @@ export default function App() {
     };
   }, [gameState, currentDialogueNpc, interactWithNpc, handleCheatRandomOneAnswer]);
 
-  // Click on map to move (touch-friendly mouse navigation)
+  // Double tap / double click NPC interaction
+  const handleNpcDoubleInteraction = (clickX, clickY) => {
+    const npcIdx = NPC_POSITIONS.findIndex(npc => {
+      const npcX = npc.c * TILE_SIZE + TILE_SIZE / 2;
+      const npcY = npc.r * TILE_SIZE + TILE_SIZE / 2;
+      return Math.hypot(clickX - npcX, clickY - npcY) < 30;
+    });
+    
+    if (npcIdx !== -1) {
+      const npc = NPC_POSITIONS[npcIdx];
+      const px = playerPosRef.current.x;
+      const py = playerPosRef.current.y;
+      const npcX = npc.c * TILE_SIZE + TILE_SIZE / 2;
+      const npcY = npc.r * TILE_SIZE + TILE_SIZE / 2;
+      const dist = Math.hypot(px - npcX, py - npcY);
+      
+      if (dist < 55) {
+        // Trigger dialogue directly
+        const adj = { index: npcIdx, r: npc.r, c: npc.c, emoji: npc.emoji };
+        if (!resolvedNpcsRef.current.has(npcIdx)) {
+          const unansweredQ1s = questionsData.slice(0, 20).filter(q => !answersRef.current[q.id]);
+          const q1 = unansweredQ1s[Math.floor(Math.random() * unansweredQ1s.length)] || questionsData[0];
+          
+          const unansweredQ2s = questionsData.slice(20, 40).filter(q => !answersRef.current[q.id]);
+          const q2 = unansweredQ2s[Math.floor(Math.random() * unansweredQ2s.length)] || questionsData[20];
+          
+          setActiveDialogueQ1(q1);
+          setActiveDialogueQ2(q2);
+          setCurrentDialogueNpc(adj);
+          setDialogueStep(0);
+        }
+      } else {
+        // Steer player adjacent to this NPC
+        const directions = [
+          { r: npc.r - 1, c: npc.c },
+          { r: npc.r + 1, c: npc.c },
+          { r: npc.r, c: npc.c - 1 },
+          { r: npc.r, c: npc.c + 1 }
+        ];
+        for (let d of directions) {
+          if (d.r >= 0 && d.r < MAP_SIZE && d.c >= 0 && d.c < MAP_SIZE) {
+            if (INITIAL_MAP[d.r][d.c] === 0) {
+              targetPosRef.current = {
+                x: d.c * TILE_SIZE + TILE_SIZE / 2,
+                y: d.r * TILE_SIZE + TILE_SIZE / 2
+              };
+              break;
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // Click on map to move (touch-friendly mouse navigation, translated by camera offset)
   const handleCanvasClick = (e) => {
     if (gameState !== 'playing' || currentDialogueNpc !== null) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const clickX = e.clientX - rect.left - cameraOffsetRef.current.x;
+    const clickY = e.clientY - rect.top - cameraOffsetRef.current.y;
     
-    targetPosRef.current = { x: clickX, y: clickY };
+    // Check double click on desktop
+    const now = Date.now();
+    if (now - lastClickTimeRef.current < 300) {
+      handleNpcDoubleInteraction(clickX, clickY);
+    } else {
+      targetPosRef.current = { x: clickX, y: clickY };
+    }
+    lastClickTimeRef.current = now;
   };
 
-  // Touch on map to move for Android & iOS mobile browsers
-  const handleCanvasTouch = (e) => {
+  // Touch handlers for mobile (One-finger tap to move, double-tap NPC, Two-finger drag to pan)
+  const handleTouchStart = (e) => {
     if (gameState !== 'playing' || currentDialogueNpc !== null) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    const touchX = touch.clientX - rect.left;
-    const touchY = touch.clientY - rect.top;
     
-    targetPosRef.current = { x: touchX, y: touchY };
+    if (e.touches.length === 1) {
+      // Single finger: tap movement or double tap NPC
+      const t = e.touches[0];
+      const clickX = t.clientX - rect.left - cameraOffsetRef.current.x;
+      const clickY = t.clientY - rect.top - cameraOffsetRef.current.y;
+      
+      const now = Date.now();
+      if (now - lastClickTimeRef.current < 300) {
+        handleNpcDoubleInteraction(clickX, clickY);
+      } else {
+        targetPosRef.current = { x: clickX, y: clickY };
+      }
+      lastClickTimeRef.current = now;
+      
+      lastTouchPosRef.current = { x: t.clientX, y: t.clientY };
+    } else if (e.touches.length === 2) {
+      // Two fingers: start drag pan
+      isDraggingRef.current = true;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      lastTouchPosRef.current = {
+        x: (t1.clientX + t2.clientX) / 2,
+        y: (t1.clientY + t2.clientY) / 2
+      };
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (gameState !== 'playing' || currentDialogueNpc !== null) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    
+    if (e.touches.length === 1 && !isDraggingRef.current) {
+      // Continuous single touch drag to steer player
+      const t = e.touches[0];
+      const clickX = t.clientX - rect.left - cameraOffsetRef.current.x;
+      const clickY = t.clientY - rect.top - cameraOffsetRef.current.y;
+      targetPosRef.current = { x: clickX, y: clickY };
+    } else if (e.touches.length === 2) {
+      // Two finger drag to pan map
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const midX = (t1.clientX + t2.clientX) / 2;
+      const midY = (t1.clientY + t2.clientY) / 2;
+      
+      const dx = midX - lastTouchPosRef.current.x;
+      const dy = midY - lastTouchPosRef.current.y;
+      
+      cameraOffsetRef.current.x += dx;
+      cameraOffsetRef.current.y += dy;
+      
+      // Clamp camera offset based on current viewport size
+      const displayWidth = rect.width;
+      const displayHeight = rect.height;
+      
+      cameraOffsetRef.current.x = Math.max(Math.min(0, cameraOffsetRef.current.x), -(MAP_SIZE * TILE_SIZE - displayWidth));
+      cameraOffsetRef.current.y = Math.max(Math.min(0, cameraOffsetRef.current.y), -(MAP_SIZE * TILE_SIZE - displayHeight));
+      
+      lastTouchPosRef.current = { x: midX, y: midY };
+      e.preventDefault(); // Prevent standard page scroll
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (e.touches.length < 2) {
+      isDraggingRef.current = false;
+    }
   };
 
   // Canvas loop synchronization refs to prevent stale closure states
@@ -651,6 +783,9 @@ export default function App() {
       // ----------------------------------------------------
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      ctx.save();
+      ctx.translate(cameraOffsetRef.current.x, cameraOffsetRef.current.y);
+      
       for (let r = 0; r < MAP_SIZE; r++) {
         for (let c = 0; c < MAP_SIZE; c++) {
           const tile = INITIAL_MAP[r][c];
@@ -785,6 +920,8 @@ export default function App() {
       ctx.fill();
       ctx.restore();
       
+      ctx.restore(); // Close cameraOffset translate save context
+      
       requestRef.current = requestAnimationFrame(loop);
     };
     
@@ -832,7 +969,7 @@ export default function App() {
               <div className="instruction-single-card">
                 <div className="instruction-emoji">🔮</div>
                 <h3>探索答题</h3>
-                <p>寻找林中的心灵引导者，靠近时按<strong>空格键(SPACE)</strong>或<strong>手指点击</strong>，开启心灵对话。</p>
+                <p>寻找林中的心灵引导者，站在NPC身边时按空格键(Space)或手机屏幕点击心灵导引者，开启心灵对话。</p>
               </div>
               <button className="btn-primary" onClick={() => setStartStep(3)}>继续 (3 / 4)</button>
             </div>
@@ -894,7 +1031,7 @@ export default function App() {
                 })}
               </div>
               
-              <div className="stat-row" style={{ marginTop: '20px' }}>
+              <div className="stat-row portal-status-row" style={{ marginTop: '20px' }}>
                 <span className="stat-label">传送门点亮状态：</span>
                 <span className="stat-value" style={{ color: resolvedNpcs.size >= 16 ? 'var(--gold)' : 'var(--text-secondary)' }}>
                   {resolvedNpcs.size >= 16 ? '🌟 已点亮 (前往右下角)' : '🔒 未唤醒'}
@@ -936,7 +1073,9 @@ export default function App() {
               width={MAP_SIZE * TILE_SIZE} 
               height={MAP_SIZE * TILE_SIZE}
               onClick={handleCanvasClick}
-              onTouchStart={handleCanvasTouch}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
             ></canvas>
             
             {/* Interaction Prompt Floating Indicator */}
