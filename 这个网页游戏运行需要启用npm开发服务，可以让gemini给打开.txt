@@ -1,0 +1,19 @@
+第一步：打开您的终端
+按键盘快捷键 Win + R，输入 powershell（或 cmd），然后按回车。
+
+第二步：切换到游戏项目文件夹
+在终端中复制并运行以下命令（切换到当前游戏项目路径）：
+
+powershell
+
+
+d:
+cd "d:\Lerz as Designer\VJ\Rinsen\RMGame"
+第三步：启动开发服务
+运行以下命令启动服务：
+
+powershell
+
+
+npm run dev
+运行后，终端中会显示一行绿色的 ➜  Local:   http://localhost:5173/。此时您只需按住 Ctrl 键点击该链接，或在浏览器中手动输入该网址即可。
