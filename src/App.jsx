@@ -449,6 +449,20 @@ export default function App() {
     targetPosRef.current = { x: clickX, y: clickY };
   };
 
+  // Touch on map to move for Android & iOS mobile browsers
+  const handleCanvasTouch = (e) => {
+    if (gameState !== 'playing' || currentDialogueNpc !== null) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    
+    targetPosRef.current = { x: touchX, y: touchY };
+  };
+
   // Canvas loop synchronization refs to prevent stale closure states
   const answersRef = useRef(answers);
   const resolvedNpcsRef = useRef(resolvedNpcs);
@@ -545,44 +559,17 @@ export default function App() {
       // 2. TILE COLLISION DETECTION & SLIDING RESOLUTION
       // ----------------------------------------------------
       const checkCollision = (x, y) => {
-        const pr = 9; // Slightly smaller player radius (9px) prevents getting stuck in 2-tile wide corridors
+        const pr = 9;
         const left = x - pr;
         const right = x + pr;
         const top = y - pr;
         const bottom = y + pr;
         
-        const startCol = Math.floor(left / TILE_SIZE);
-        const endCol = Math.floor(right / TILE_SIZE);
-        const startRow = Math.floor(top / TILE_SIZE);
-        const endRow = Math.floor(bottom / TILE_SIZE);
-        
-        for (let r = startRow; r <= endRow; r++) {
-          for (let c = startCol; c <= endCol; c++) {
-            if (r < 0 || r >= MAP_SIZE || c < 0 || c >= MAP_SIZE) {
-              return true; // Out of bounds is solid
-            }
-            const tile = INITIAL_MAP[r][c];
-            let isSolid = false;
-            
-            if (tile === 1) {
-              isSolid = true; // Tree wall
-            } else if (tile === 5) {
-              // Locked gate (solid if solved NPC count < 16)
-              if (resolvedNpcsRef.current.size < 16) {
-                isSolid = true;
-              }
-            } else if (tile === 2) {
-              // Unresolved NPC is solid
-              const npcIndex = NPC_POSITIONS.findIndex(n => n.r === r && n.c === c);
-              if (npcIndex !== -1 && !resolvedNpcsRef.current.has(npcIndex)) {
-                isSolid = true;
-              }
-            }
-            
-            if (isSolid) return true;
-          }
+        // Out of bounds check
+        if (left < 0 || right > MAP_SIZE * TILE_SIZE || top < 0 || bottom > MAP_SIZE * TILE_SIZE) {
+          return true; // Out of bounds is solid
         }
-        return false;
+        return false; // Free roaming! No tree/gate collisions
       };
       
       let px = playerPosRef.current.x;
@@ -892,7 +879,6 @@ export default function App() {
               • <strong>移动</strong>：W/A/S/D 或 方向键<br />
               • <strong>交互</strong>：站在 NPC 身边时按 <strong>空格键 (Space)</strong> 或 <strong>E 键</strong><br />
               • <strong>关闭对话</strong>：按键盘 <strong>Esc 键</strong> 或 <strong>Q 键</strong> 退出对话。<br />
-              • <strong>随机答题</strong>：按键盘 <strong>T 键</strong> 随机回答当前/后台一道题。<br />
               • <strong>触摸</strong>：在屏幕上直接点击目的地即可移动。
             </div>
             
@@ -906,6 +892,7 @@ export default function App() {
               width={MAP_SIZE * TILE_SIZE} 
               height={MAP_SIZE * TILE_SIZE}
               onClick={handleCanvasClick}
+              onTouchStart={handleCanvasTouch}
             ></canvas>
             
             {/* Interaction Prompt Floating Indicator */}
@@ -927,9 +914,6 @@ export default function App() {
                 </div>
                 <div className="dialog-npc-header">
                   <span className="dialog-npc-avatar">{currentDialogueNpc.emoji}</span>
-                  <h3 className="dialog-npc-name">
-                    {dialogueStep === 0 ? "优势特质探索" : "压力特质探索"}
-                  </h3>
                 </div>
                 <p className="dialog-question-text">
                   在以下描述中，选出一个<strong>最符合你的第一印象</strong>或<strong>童年倾向</strong>的选择：
@@ -949,9 +933,7 @@ export default function App() {
                   ))}
                 </div>
                 
-                <button className="dialog-cheat-btn" onClick={handleCheatRandomOneAnswer}>
-                  🪄 随机回答这题 (跳过)
-                </button>
+
               </div>
             </div>
           )}
