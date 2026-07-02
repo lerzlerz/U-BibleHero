@@ -346,7 +346,7 @@ export default function App() {
       });
     }
   }, [answers, currentDialogueNpc, dialogueStep, activeDialogueQ1, activeDialogueQ2, resolvedNpcs]);
-  // Answer a question and progress dialogue
+  // Answer a question and progress dialogue (with interval step to prevent double taps)
   const handleAnswerQuestion = (selectedType) => {
     if (!currentDialogueNpc || !activeDialogueQ1 || !activeDialogueQ2) return;
     const activeQ = dialogueStep === 0 ? activeDialogueQ1 : activeDialogueQ2;
@@ -354,7 +354,7 @@ export default function App() {
     setAnswers(prev => ({ ...prev, [activeQ.id]: selectedType }));
     
     if (dialogueStep === 0) {
-      setDialogueStep(1);
+      setDialogueStep(0.5); // Go to "下一题" interval screen
     } else {
       // Resolve NPC
       const npcIdx = currentDialogueNpc.index;
@@ -662,16 +662,20 @@ export default function App() {
       if (keysRef.current.left) ax -= 1;
       if (keysRef.current.right) ax += 1;
       
-      // Check mouse target steering
-      if (ax === 0 && ay === 0 && targetPosRef.current) {
+      // Check mouse target steering (snap and stop immediately on arrival to prevent overshoot)
+      if (targetPosRef.current) {
         const dx = targetPosRef.current.x - playerPosRef.current.x;
         const dy = targetPosRef.current.y - playerPosRef.current.y;
         const dist = Math.hypot(dx, dy);
         
-        if (dist < 4) {
+        if (dist < 5) {
+          playerPosRef.current.x = targetPosRef.current.x;
+          playerPosRef.current.y = targetPosRef.current.y;
           targetPosRef.current = null;
           vxRef.current = 0;
           vyRef.current = 0;
+          ax = 0;
+          ay = 0;
         } else {
           const angle = Math.atan2(dy, dx);
           ax = Math.cos(angle);
@@ -753,6 +757,16 @@ export default function App() {
       
       playerPosRef.current.x = px;
       playerPosRef.current.y = py;
+      
+      // CAMERA FOLLOW SYSTEM
+      const rect = canvas.getBoundingClientRect();
+      const displayWidth = rect.width;
+      const displayHeight = rect.height;
+      const targetCamX = displayWidth / 2 - px;
+      const targetCamY = displayHeight / 2 - py;
+      
+      cameraOffsetRef.current.x = Math.max(Math.min(0, targetCamX), -(MAP_SIZE * TILE_SIZE - displayWidth));
+      cameraOffsetRef.current.y = Math.max(Math.min(0, targetCamY), -(MAP_SIZE * TILE_SIZE - displayHeight));
       
       // Check if we hit the portal
       if (resolvedNpcsRef.current.size >= 16) {
@@ -1000,8 +1014,8 @@ export default function App() {
             </div>
             
             <div className="stats-panel">
-              <div className="stat-row">
-                <span className="stat-label">已探索导引者：</span>
+              <div className="stat-row visited-status-row">
+                <span className="stat-label">已访问导引者：</span>
                 <span className="stat-value highlight">{resolvedNpcs.size} / 16</span>
               </div>
               <div className="stat-row">
@@ -1088,18 +1102,18 @@ export default function App() {
           </div>
           
           {/* ----------------- DIALOGUE/QUESTION OVERLAY ----------------- */}
-          {currentDialogueNpc !== null && activeQuestion && (
+          {currentDialogueNpc !== null && activeQuestion && dialogueStep !== 0.5 && (
             <div className="dialog-overlay">
               <div className="dialog-card">
                 <button className="dialog-close-btn" onClick={() => { setCurrentDialogueNpc(null); setDialogueStep(0); setActiveDialogueQ1(null); setActiveDialogueQ2(null); }}>✕</button>
                 <div className="dialog-progress">
-                  导引者 {currentDialogueNpc.index + 1} / 20 • 抉择 {dialogueStep + 1} / 2
+                  导引者 {currentDialogueNpc.index + 1} / 20 • 抉择 {dialogueStep === 0 ? 1 : 2} / 2
                 </div>
                 <div className="dialog-npc-header">
                   <span className="dialog-npc-avatar">{currentDialogueNpc.emoji}</span>
                 </div>
                 <p className="dialog-question-text">
-                  在以下描述中，选出一个<strong>最符合你的第一印象</strong>或<strong>童年倾向</strong>的选择：
+                  你是。。。？（选择最符合你的选项）
                 </p>
                 <div className="options-list">
                   {activeQuestion.options.map((opt, oIdx) => (
@@ -1115,15 +1129,32 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                
-
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* ----------------- RESULTS SCREEN ----------------- */}
+          {/* Interval Screen between Q1 and Q2 */}
+          {currentDialogueNpc !== null && dialogueStep === 0.5 && (
+            <div className="dialog-overlay">
+              <div className="dialog-card interval-card">
+                <div className="dialog-npc-header">
+                  <span className="dialog-npc-avatar">{currentDialogueNpc.emoji}</span>
+                </div>
+                <p className="dialog-question-text" style={{ textAlign: 'center', margin: '20px 0', fontSize: '1.05rem' }}>
+                  第一题探索完毕，准备好面对第二个抉择了吗？
+                </p>
+                <button 
+                  className="btn-primary" 
+                  style={{ width: '100%', padding: '12px', fontSize: '1.05rem' }} 
+                  onClick={() => setDialogueStep(1)}
+                >
+                  下一题
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* ----------------- RESULTS SCREEN ----------------- */}
       {gameState === 'results' && resultsProfile && (
         <div className="results-screen">
           <div style={{ fontFamily: 'Cinzel', color: 'var(--gold)', fontSize: '2.5rem', marginBottom: '30px', textShadow: '0 0 10px rgba(255,183,3,0.3)' }}>

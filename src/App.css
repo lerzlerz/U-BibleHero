@@ -934,7 +934,7 @@ canvas {
     height: auto !important;
     border-right: none !important;
     border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
-    padding: 10px 15px !important;
+    padding: 8px 12px !important;
     box-sizing: border-box !important;
     background: rgba(10, 18, 14, 0.95) !important;
   }
@@ -943,7 +943,7 @@ canvas {
   .hud-sidebar .hud-header,
   .hud-sidebar .controls-hint,
   .hud-sidebar .restart-btn,
-  .hud-sidebar .stats-panel .stat-row:not(.portal-status-row),
+  .hud-sidebar .stats-panel .stat-row:not(.portal-status-row):not(.visited-status-row),
   .hud-sidebar .stats-panel .progress-bar-container {
     display: none !important;
   }
@@ -952,37 +952,50 @@ canvas {
   .hud-sidebar .stats-panel {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     margin: 0 !important;
   }
   
-  /* Align NPC slots into exactly 2 rows of 10 slots each */
+  /* Align NPC slots into exactly 1 row of 20 columns */
   .hud-sidebar .npc-slots-grid {
     display: grid !important;
-    grid-template-columns: repeat(10, 1fr) !important;
-    gap: 4px !important;
-    margin: 4px 0 !important;
-    padding: 6px !important;
+    grid-template-columns: repeat(20, 1fr) !important; /* 20 tiny slots in 1 row! */
+    gap: 2.5px !important;
+    margin: 3px 0 !important;
+    padding: 4px !important;
     background: rgba(255, 255, 255, 0.02) !important;
   }
   
   .hud-sidebar .npc-slot {
-    font-size: 0.9rem !important;
-    border-radius: 4px !important;
+    font-size: 0.72rem !important; /* Small icons for single row */
+    border-radius: 3px !important;
+    border-width: 1px !important;
   }
   
-  /* Position Portal Status Row */
+  /* Show visited and portal rows under the slots */
+  .hud-sidebar .stats-panel .stat-row.visited-status-row,
   .hud-sidebar .stats-panel .stat-row.portal-status-row {
-    margin-top: 5px !important;
-    padding-top: 5px !important;
+    display: flex !important;
+    margin-top: 3px !important;
+    padding-top: 3px !important;
     border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
-    font-size: 0.85rem !important;
+    font-size: 0.78rem !important;
+    line-height: 1.3;
+  }
+  
+  /* Visited status and Portal light status have the exact same font size and color: ORANGE */
+  .hud-sidebar .stats-panel .stat-row.visited-status-row .stat-label,
+  .hud-sidebar .stats-panel .stat-row.visited-status-row .stat-value,
+  .hud-sidebar .stats-panel .stat-row.portal-status-row .stat-label,
+  .hud-sidebar .stats-panel .stat-row.portal-status-row .stat-value {
+    color: #fb8500 !important; /* Premium theme orange */
+    font-weight: 600 !important;
   }
   
   .hud-sidebar .temple-unlocked-card {
-    margin: 5px 0 0 0 !important;
-    padding: 8px !important;
-    font-size: 0.75rem !important;
+    margin: 4px 0 0 0 !important;
+    padding: 6px !important;
+    font-size: 0.72rem !important;
   }
   
   /* Ensure Canvas takes rest of viewport and is scrollable/overflow-scrollable */
@@ -990,7 +1003,7 @@ canvas {
     flex-grow: 1 !important;
     width: 100% !important;
     height: 0 !important; /* Forces flex to take rest */
-    overflow: hidden !important; /* Panned via dual finger drag */
+    overflow: hidden !important;
     position: relative !important;
     background: #060b08 !important;
   }
