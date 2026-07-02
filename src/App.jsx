@@ -127,6 +127,7 @@ const CHARACTER_AVATARS = {
 // ----------------------------------------------------
 export default function App() {
   const [gameState, setGameState] = useState('start'); // start | playing | results
+  const [startStep, setStartStep] = useState(0); // 4-step welcome pagination
   
   // Answers database: keys 1 to 40, values D/I/S/C
   const [answers, setAnswers] = useState({});
@@ -190,6 +191,7 @@ export default function App() {
     setActiveDialogueQ2(null);
     setAdjacentNpcState(null);
     setResultsProfile(null);
+    setStartStep(0);
     setGameState('start');
   };
 
@@ -338,6 +340,30 @@ export default function App() {
       });
     }
   }, [answers, currentDialogueNpc, dialogueStep, activeDialogueQ1, activeDialogueQ2, resolvedNpcs]);
+  // Answer a question and progress dialogue
+  const handleAnswerQuestion = (selectedType) => {
+    if (!currentDialogueNpc || !activeDialogueQ1 || !activeDialogueQ2) return;
+    const activeQ = dialogueStep === 0 ? activeDialogueQ1 : activeDialogueQ2;
+    
+    setAnswers(prev => ({ ...prev, [activeQ.id]: selectedType }));
+    
+    if (dialogueStep === 0) {
+      setDialogueStep(1);
+    } else {
+      // Resolve NPC
+      const npcIdx = currentDialogueNpc.index;
+      setResolvedNpcs(prev => {
+        const next = new Set(prev);
+        next.add(npcIdx);
+        return next;
+      });
+      setCurrentDialogueNpc(null);
+      setDialogueStep(0);
+      setActiveDialogueQ1(null);
+      setActiveDialogueQ2(null);
+    }
+  };
+
   // Listen to Keyboard Inputs
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -779,34 +805,52 @@ export default function App() {
         <div className="start-screen">
           <div className="start-title">心灵迷宫</div>
           <div className="start-subtitle">属灵性格探索</div>
-          <p className="start-desc">
-            欢迎来到心灵迷宫！你将扮演一位探索者，在静谧的圣所迷雾中漫游。
-            林中散布着 20 位**心灵导引者**。每遇见一位导引者，他将向你提出两道关于性格的深度抉择（优势与缺点）。
-            我们采用**最少维度补偿动态题库**，确保你的每一次选择，都在为你精准构筑真实的灵魂图谱，在心灵的探索之旅中发现匹配自己性格的圣经人物。
-          </p>
-          
-          <div className="instructions-grid">
-            <div className="instruction-card">
-              <div className="instruction-emoji">🚶</div>
-              <h3>键盘漫游</h3>
-              <p>使用 <strong>W/A/S/D</strong> 或 <strong>方向键</strong> 操控角色进行平顺的物理滑行移动，或直接点击地面目的地移动。</p>
+
+          {startStep === 0 && (
+            <div className="start-page-content">
+              <p className="start-desc">
+                欢迎来到静心森林！<br /><br />
+                你将扮演一位探索者，在静谧的森林中漫游。林中散布着<strong>心灵导引者</strong>。每遇见一位导引者，他将向你提出两个问题。遇到了足够的引导者之后，你将在心灵的探索之旅中发现匹配自己性格的圣经人物。
+              </p>
+              <button className="btn-primary" onClick={() => setStartStep(1)}>继续 (1 / 4)</button>
             </div>
-            <div className="instruction-card">
-              <div className="instruction-emoji">🔮</div>
-              <h3>探索答题</h3>
-              <p>寻找林中发光的 20 个 <strong>水晶球（NPC）</strong>，靠近时按 <strong>空格键（SPACE）</strong> 或 <strong>E 键</strong> 开启心灵对话。</p>
+          )}
+
+          {startStep === 1 && (
+            <div className="start-page-content">
+              <div className="instruction-single-card">
+                <div className="instruction-emoji">🚶</div>
+                <h3>键盘或触摸漫游</h3>
+                <p>使用 <strong>W/A/S/D</strong> 或 <strong>方向键</strong> 操控角色进行平顺的物理滑行移动，或直接点击地面目的地移动。</p>
+              </div>
+              <button className="btn-primary" onClick={() => setStartStep(2)}>继续 (2 / 4)</button>
             </div>
-            <div className="instruction-card">
-              <div className="instruction-emoji">🚪</div>
-              <h3>终点之门</h3>
-              <p>只需解答完 16 位导引者 (80% 探索进度) 后，迷宫底部的 <strong>传送门</strong> 将会开启，带你揭示匹配你性格的圣经人物画像。</p>
+          )}
+
+          {startStep === 2 && (
+            <div className="start-page-content">
+              <div className="instruction-single-card">
+                <div className="instruction-emoji">🔮</div>
+                <h3>探索答题</h3>
+                <p>寻找林中的心灵引导者，靠近时按<strong>空格键(SPACE)</strong>或<strong>手指点击</strong>，开启心灵对话。</p>
+              </div>
+              <button className="btn-primary" onClick={() => setStartStep(3)}>继续 (3 / 4)</button>
             </div>
-          </div>
-          
-          <button className="btn-primary" onClick={handleStartGame}>开启心灵探索</button>
+          )}
+
+          {startStep === 3 && (
+            <div className="start-page-content">
+              <div className="instruction-single-card">
+                <div className="instruction-emoji">🚪</div>
+                <h3>终点之门</h3>
+                <p>找到足够多的心灵引导者后，森林底部的传送门将会开启，带你揭示匹配你性格的圣经人物画像。</p>
+              </div>
+              <button className="btn-primary" onClick={handleStartGame}>开启心灵探索 (4 / 4)</button>
+            </div>
+          )}
         </div>
       )}
-
+      
       {/* ----------------- MAIN GAME SCREEN ----------------- */}
       {gameState === 'playing' && (
         <div className="game-container">
